@@ -94,7 +94,7 @@ register char   buf[];
 
         i = 0;
 
-        while ((c = _fgetc_nolock(ffp)) != EOF && c != '\n') {
+        while ((c = fgetc(ffp)) != EOF && c != '\n') {
                 if (i >= nbuf-1) {
                         mlwrite("File has long line");
                         return (FIOERR);

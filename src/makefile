@@ -7,7 +7,7 @@ ifeq ($(OS), Windows_NT)
 
     #check to see if cygwin
     ifeq ($(findstring .exe,$(SHELL)),)
-        LDFLAGS = -s -flto -lncursesw
+        LDFLAGS = -s -flto
         EXE     = me
     endif
 else
@@ -32,9 +32,6 @@ OBJ =         \
 	region.o  \
 	search.o  \
 	spawn.o   \
-	tcap.o    \
-	termio.o  \
-	vt52.o    \
 	window.o  \
 	word.o
 
@@ -56,9 +53,6 @@ random.o:   random.c   ed.h
 region.o:   region.c   ed.h
 search.o:   search.c   ed.h
 spawn.o:    spawn.c    ed.h
-tcap.o:     tcap.c     ed.h
-termio.o:   termio.c   ed.h
-vt52.o:     vt52.c     ed.h
 window.o:   window.c   ed.h
 word.o:     word.c     ed.h
 

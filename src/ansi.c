@@ -4,8 +4,17 @@
  * "termio.c". It compiles into nothing if not an ANSI device.
  */
 
-#include        <stdio.h>
-#include        "ed.h"
+#if !defined(_WIN32) && !defined(_WIN64)
+
+#include <stdio.h>
+#include <termios.h>
+#include <signal.h>
+#include <errno.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+
+#undef CTRL
+#include "ed.h"
 
 #if     ANSI
 
@@ -25,6 +34,8 @@ extern  int     ansieeop();
 extern  int     ansibeep();
 extern  int     ansiopen();
 
+struct  termios ostate;
+
 /*
  * Standard terminal interface dispatch table. Most of the fields point into
  * "termio" code.
@@ -32,7 +43,7 @@ extern  int     ansiopen();
 TERM    term    = {
         NROW-1,
         NCOL,
-        &ansiopen,
+        &ttopen,
         &ttclose,
         &ttgetc,
         &ttputc,
@@ -43,65 +54,136 @@ TERM    term    = {
         &ansibeep
 };
 
-ansimove(row, col)
-{
-        ttputc(ESC);
-        ttputc('[');
-        ansiparm(row+1);
-        ttputc(';');
-        ansiparm(col+1);
-        ttputc('H');
+/*
+ * Write a character to the display. On VMS, terminal output is buffered, and
+ * we just put the characters in the big array, after checking for overflow.
+ * On CPM terminal I/O unbuffered, so we just write the byte out. Ditto on
+ * MS-DOS (use the very very raw console output routine).
+ */
+ttputc(c) {
+    fputc(c, stdout);
 }
 
-ansieeol()
-{
-        ttputc(ESC);
-        ttputc('[');
-        ttputc('K');
+ansimove(row, col) {
+    fprintf(stdout, "\033[%d;%dH", row + 1, col + 1);
 }
 
-ansieeop()
-{
-        ttputc(ESC);
-        ttputc('[');
-        ttputc('J');
+ansieeol() {
+    fputs("\033[K", stdout);
 }
 
-ansibeep()
-{
+ansieeop() {
+    fputs("\033[J", stdout);
+}
+
+ansibeep() {
         ttputc(BEL);
         ttflush();
 }
 
-ansiparm(n)
-register int    n;
-{
-        register int    q;
+ttopen() {
+  struct winsize w;
+  struct  termios nstate;
 
-        q = n/10;
-        if (q != 0)
-                ansiparm(q);
-        ttputc((n%10) + '0');
+  /* save terminal flags */
+  if ((tcgetattr(0, &ostate) < 0)) {
+      puts ("Can't read terminal capabilites\n");
+      exit (1);
+  }
+  nstate = ostate;
+  cfmakeraw(&nstate);		/* set raw mode */
+  nstate.c_cc[VMIN] = 1;
+  nstate.c_cc[VTIME] = 0;	/* block indefinitely for a single char */
+  if (tcsetattr(0, TCSADRAIN, &nstate) < 0) {
+      puts ("Can't set terminal mode\n");
+      exit (1);
+  }
+  /* provide a smaller terminal output buffer so that the type ahead
+   * detection works better (more often) */
+  /*setbuffer(stdout, &tobuf[0], TBUFSIZ);*/
+  signal(SIGTSTP, SIG_DFL);
+
+  if (ioctl(0, TIOCGWINSZ, &w) >= 0) {
+      term.t_ncol = w.ws_col;
+      term.t_nrow = w.ws_row - 1;
+  }
+}
+
+/*
+ * Flush terminal buffer. Does real work where the terminal output is buffered
+ * up. A no-operation on systems where byte at a time terminal I/O is done.
+ */
+ttflush() {
+    fflush(stdout);
+}
+
+/*
+ * This function gets called just before we go back home to the command
+ * interpreter. On VMS it puts the terminal back in a reasonable state.
+ * Another no-operation on CPM.
+ */
+ttclose() {
+  ttflush ();
+  if (tcsetattr(0, TCSADRAIN, &ostate) < 0) {
+      puts ("Can't restore terminal flags");
+      exit (1);
+  }
+}
+
+/*
+ * Read a character from the terminal, performing no editing and doing no echo
+ * at all. More complex in VMS that almost anyplace else, which figures. Very
+ * simple on CPM, because the system can do exactly what you want.
+ */
+ttgetc() {
+  int nread;
+  char c;
+  while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
+    if (nread == -1 && errno != EAGAIN) return -1;
+  }
+
+  if (c == '\x1b') {
+    char seq[3];
+
+    if (read(STDIN_FILENO, &seq[0], 1) != 1) return '\x1b';
+    if (read(STDIN_FILENO, &seq[1], 1) != 1) return '\x1b';
+
+    if (seq[0] == '[') {
+      if (seq[1] >= '0' && seq[1] <= '9') {
+        if (read(STDIN_FILENO, &seq[2], 1) != 1) return '\x1b';
+        if (seq[2] == '~') {
+          switch (seq[1]) {
+            case '1': return CTRL|'A'; /* HOME_KEY; */
+            case '3': return CTRL|'D'; /* DEL_KEY;  */
+            case '4': return CTRL|'E'; /* END_KEY;  */
+            case '5': return META|'V'; /* PAGE_UP;  */
+            case '6': return CTRL|'V'; /* PAGE_DOWN;*/
+            case '7': return CTRL|'A'; /* HOME_KEY; */
+            case '8': return CTRL|'E'; /* END_KEY;  */
+          }
+        }
+      } else {
+        switch (seq[1]) {
+          case 'A': return CTRL|'P'; /* ARROW_UP;   */
+          case 'B': return CTRL|'N'; /* ARROW_DOWN; */
+          case 'C': return CTRL|'F'; /* ARROW_RIGHT;*/
+          case 'D': return CTRL|'B'; /* ARROW_LEFT; */
+          case 'H': return CTRL|'A'; /* HOME_KEY;   */
+          case 'F': return CTRL|'E'; /* END_KEY;    */
+        }
+      }
+    } else if (seq[0] == 'O') {
+      switch (seq[1]) {
+        case 'H': return CTRL|'A'; /* HOME_KEY;*/
+        case 'F': return CTRL|'E'; /* END_KEY; */
+      }
+    }
+
+    return '\x1b';
+  } else {
+    return c;
+  }
 }
 
 #endif
-
-ansiopen()
-{
-#if     V7
-        register char *cp;
-        char *getenv();
-
-        if ((cp = getenv("TERM")) == NULL) {
-                puts("Shell variable TERM not defined!");
-                exit(1);
-        }
-        if (strcmp(cp, "vt100") != 0) {
-                puts("Terminal type not 'vt100'!");
-                exit(1);
-        }
 #endif
-#if !WIN32
-        ttopen();
-#endif
-}

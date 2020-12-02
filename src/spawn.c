@@ -71,17 +71,18 @@ spawncli(f, n)
         return(TRUE);
 #endif
 #if     V7 || LINUX
+        int rc;
         movecursor(term.t_nrow, 0);             /* Seek to last line.   */
         (*term.t_flush)();
         ttclose();                              /* stty to old settings */
         if ((cp = getenv("SHELL")) != NULL && *cp != '\0')
-                system(cp);
+                rc = system(cp);
         else
-                system("exec /bin/sh");
+                rc = system("exec /bin/sh");
         sgarbf = TRUE;
         sleep(2);
         ttopen();
-        return(TRUE);
+        return (rc != -1);
 #endif
 #if WIN32
         movecursor(term.t_nrow, 0);             /* Seek to last line.   */
@@ -103,6 +104,7 @@ spawn(f, n)
 {
         register int    s;
         char            line[NLINE];
+        int             rc;
 #if     AMIGA
         long newcli;
 
@@ -156,7 +158,7 @@ spawn(f, n)
         (*term.t_putchar)('\n');                /* Already have '\r'    */
         (*term.t_flush)();
         ttclose();                              /* stty to old modes    */
-        system(line);
+        rc = system(line);
         sleep(2);
         ttopen();
         mlputs("[End]");                        /* Pause.               */
@@ -164,7 +166,7 @@ spawn(f, n)
         while ((s = (*term.t_getchar)()) != '\r' && s != ' ')
                 ;
         sgarbf = TRUE;
-        return (TRUE);
+        return (rc != -1);
 #endif
 }
 
