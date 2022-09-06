@@ -11,6 +11,7 @@
  */
 
 #include        <stdio.h>
+#include        <stdarg.h>
 #include        "ed.h"
 
 #define WFDEBUG 0                       /* Window flag debug. */
@@ -725,14 +726,14 @@ mlreply(prompt, buf, nbuf)
  * stack grows down; this assumption is made by the "++" in the argument scan
  * loop. Set the "message line" flag TRUE.
  */
-mlwrite(fmt, arg)
-    char *fmt;
-    {
+void mlwrite(char *fmt, ...) {
+    va_list val;
     register int c;
-    register char *ap;
+
+    va_start(val, fmt);
 
     movecursor(term.t_nrow, 0);
-    ap = (char *) &arg;
+
     while ((c = *fmt++) != 0) {
         if (c != '%') {
             (*term.t_putchar)(c);
@@ -743,28 +744,23 @@ mlwrite(fmt, arg)
             c = *fmt++;
             switch (c) {
                 case 'd':
-                    mlputi(*(int *)ap, 10);
-                    ap += sizeof(int);
+                    mlputi(va_arg(val, int), 10);
                     break;
 
                 case 'o':
-                    mlputi(*(int *)ap,  8);
-                    ap += sizeof(int);
+                    mlputi(va_arg(val, int),  8);
                     break;
 
                 case 'x':
-                    mlputi(*(int *)ap, 16);
-                    ap += sizeof(int);
+                    mlputi(va_arg(val, int), 16);
                     break;
 
                 case 'D':
-                    mlputli(*(long *)ap, 10);
-                    ap += sizeof(long);
+                    mlputli(va_arg(val, long), 10);
                     break;
 
                 case 's':
-                    mlputs(*(char **)ap);
-                    ap += sizeof(char *);
+                    mlputs(va_arg(val, char *));
                     break;
 
                 default:
