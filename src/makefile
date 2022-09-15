@@ -1,5 +1,7 @@
 CC  = gcc
-CFLAGS = -std=c89 -Os -s -fomit-frame-pointer -flto
+# -flto causes link errors
+#CFLAGS = -std=c89 -Os -s -fomit-frame-pointer -flto -fno-ident -fno-asynchronous-unwind-tables
+CFLAGS = -std=c89 -Os -s -fomit-frame-pointer       -fno-ident -fno-asynchronous-unwind-tables
 
 ifeq ($(OS), Windows_NT)
     LDFLAGS = -s -flto
@@ -13,7 +15,7 @@ ifeq ($(OS), Windows_NT)
 else
     UNAME_S := $(shell uname -s)
     ifeq ($(UNAME_S), Linux)
-        LDFLAGS = -s -flto -lncurses
+        LDFLAGS = -s -flto -fuse-ld=gold
         EXE     = me
     endif
 endif
