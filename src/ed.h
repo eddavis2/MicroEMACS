@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -8,35 +7,30 @@
  * the stuff you have to edit to create a version of the editor for a specific
  * operating system and terminal.
  */
-#if defined(__CYGWIN__) || defined(__linux__)
-    #define ANSI    1
-    #define LINUX   1
-    #define TERMCAP 0
-    #define WIN32   0
-#elif defined(_WIN32) || defined(_WIN64)
-    #define ANSI    0
-    #define LINUX   0
-    #define TERMCAP 0
-    #define WIN32   1
-#else
-    error "unknown system"
-#endif
 
 #define AMIGA   0                       /* AmigaDOS, Lattice            */
 #define ST520   0                       /* ST520, TOS                   */
 #define MWC86   0
-#define V7      0                       /* V7 UN*X or Coherent          */
 #define VMS     0                       /* VAX/VMS                      */
 #define CPM     0                       /* CP/M-86                      */
-#ifndef MSDOS                           /* Already defined for Lattice  */
-#define MSDOS   0                       /* MS-DOS                       */
-#endif
 
 #define VT52    0                       /* VT52 terminal (Zenith).      */
 #define VT100   0                       /* Handle VT100 style keypad.   */
 #define LK201   0                       /* Handle LK201 style keypad.   */
 #define RAINBOW 0                       /* Use Rainbow fast video.      */
+#define TERMCAP 0                       /* Use TERMCAP                  */
 
+#if defined(__CYGWIN__) || defined(__linux__)
+    #define ANSI    1
+    #define V7      1
+    #define MSDOS   0
+#elif defined(_WIN32) || defined(_WIN64)
+    #define MSDOS   1
+    #define ANSI    0
+    #define V7      0
+#else
+    error "unknown system"
+#endif
 #define CVMVAS  1                       /* C-V, M-V arg. in screens.    */
 
 #define NFILEN  80                      /* # of bytes, file name        */
@@ -200,3 +194,5 @@ extern  TERM    term;                   /*(Terminal information.        */
 extern  BUFFER  *bfind();               /* Lookup a buffer by name      */
 extern  WINDOW  *wpopup();              /* Pop up window creation       */
 extern  LINE    *lalloc();              /* Allocate a line              */
+
+void mlwrite(char *fmt, ...);
